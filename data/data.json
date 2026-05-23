@@ -1,0 +1,81 @@
+{
+  "factions": {
+    "northern": {
+      "name": "Северные Королевства",
+      "icon": "⚔️",
+      "ability": "Рог командира: вытащить карту из колоды",
+      "leaders": [
+        {"id": "foltest_siege", "name": "Фольтест: Осадный повелитель", "icon": "👑", "power": "Очищает туман с поля (Ясная погода)", "key": "clear_weather"},
+        {"id": "foltest_steel", "name": "Фольтест: Стальной", "icon": "🛡️", "power": "Удваивает осадный ряд", "key": "double_siege"},
+        {"id": "foltest_lord", "name": "Фольтест: Владыка", "icon": "🤴", "power": "Берёт случайную карту из колоды", "key": "draw_card"}
+      ],
+      "cards": [
+        {"id": "geralt", "name": "Геральт из Ривии", "val": 15, "type": "hero", "row": "melee", "emoji": "🗡️", "abilities": [], "tip": "Герой: иммунитет к способностям"},
+        {"id": "ciri", "name": "Цирилла", "val": 15, "type": "hero", "row": "melee", "emoji": "⚡", "abilities": [], "tip": "Герой: иммунитет к способностям"},
+        {"id": "triss", "name": "Трисс Меригольд", "val": 7, "type": "hero", "row": "melee", "emoji": "🔮", "abilities": [], "tip": "Герой: иммунитет к способностям"},
+        {"id": "rosche", "name": "Вернон Роше", "val": 10, "type": "hero", "row": "melee", "emoji": "⚔️", "abilities": [], "tip": "Герой"},
+        {"id": "yenni", "name": "Йеннифэр", "val": 7, "type": "hero", "row": "ranged", "emoji": "💜", "abilities": ["medic"], "tip": "Герой-Медик: воскрешает карту из отбоя"},
+        {"id": "lutik", "name": "Лютик", "val": 2, "type": "normal", "row": "melee", "emoji": "🎵", "abilities": ["morale"], "tip": "Прилив сил: +1 всем в ряду"},
+        {"id": "zoltan", "name": "Золтан Хивай", "val": 5, "type": "normal", "row": "melee", "emoji": "🧔", "abilities": [], "tip": ""},
+        {"id": "elf_spy", "name": "Таинственный Эльф", "val": 0, "type": "spy", "row": "melee", "emoji": "👁️", "abilities": [], "tip": "Шпион: играется к врагу, вы берёте 2 карты"},
+        {"id": "dijkstra", "name": "Дийкстра", "val": 4, "type": "spy", "row": "melee", "emoji": "🕵️", "abilities": [], "tip": "Шпион: играется к врагу, вы берёте 2 карты"},
+        {"id": "stennis", "name": "Принц Стеннис", "val": 5, "type": "spy", "row": "melee", "emoji": "👑", "abilities": [], "tip": "Шпион: играется к врагу, вы берёте 2 карты"},
+        {"id": "villentrete", "name": "Виллентретенмерт", "val": 7, "type": "normal", "row": "melee", "emoji": "🐲", "abilities": ["kazn"], "tip": "Казнь: уничтожает сильнейшую карту врага"},
+        {"id": "pehota1", "name": "Пехтура (1)", "val": 1, "type": "normal", "row": "melee", "emoji": "⚔️", "abilities": ["bond"], "tip": "Прочная связь: сила ×2 если две одинаковых"},
+        {"id": "pehota2", "name": "Пехтура (2)", "val": 1, "type": "normal", "row": "melee", "emoji": "⚔️", "abilities": ["bond"], "tip": "Прочная связь: сила ×2 если две одинаковых"},
+        {"id": "sheld", "name": "Шелдон Скаггс", "val": 4, "type": "normal", "row": "ranged", "emoji": "🏹", "abilities": [], "tip": ""},
+        {"id": "keira", "name": "Кейра Мец", "val": 5, "type": "normal", "row": "ranged", "emoji": "💚", "abilities": [], "tip": ""},
+        {"id": "detmold", "name": "Детмольд", "val": 6, "type": "normal", "row": "ranged", "emoji": "📚", "abilities": [], "tip": ""},
+        {"id": "ballista", "name": "Баллиста", "val": 6, "type": "normal", "row": "siege", "emoji": "🏹", "abilities": [], "tip": ""},
+        {"id": "catapult1", "name": "Катапульта (1)", "val": 8, "type": "normal", "row": "siege", "emoji": "💥", "abilities": ["bond"], "tip": "Прочная связь"},
+        {"id": "catapult2", "name": "Катапульта (2)", "val": 8, "type": "normal", "row": "siege", "emoji": "💥", "abilities": ["bond"], "tip": "Прочная связь"},
+        {"id": "healer", "name": "Лекарь", "val": 5, "type": "normal", "row": "siege", "emoji": "⚕️", "abilities": ["medic"], "tip": "Медик: воскрешает карту из отбоя"},
+        {"id": "frost", "name": "Мороз", "val": 0, "type": "weather", "row": "melee", "emoji": "❄️", "abilities": [], "tip": "Снижает все рукопашные до 1"},
+        {"id": "fog", "name": "Мгла", "val": 0, "type": "weather", "row": "ranged", "emoji": "🌫️", "abilities": [], "tip": "Снижает все дальнобойные до 1"},
+        {"id": "rain", "name": "Проливной дождь", "val": 0, "type": "weather", "row": "siege", "emoji": "🌧️", "abilities": [], "tip": "Снижает все осадные до 1"},
+        {"id": "clear", "name": "Ясная погода", "val": 0, "type": "weather", "row": "any", "emoji": "☀️", "abilities": ["clear"], "tip": "Снимает всю погоду"},
+        {"id": "horn", "name": "Командирский рог", "val": 0, "type": "horn", "row": "any", "emoji": "📯", "abilities": [], "tip": "Удваивает силу ряда (1 рог на ряд)"},
+        {"id": "decoy", "name": "Чучело", "val": 0, "type": "decoy", "row": "any", "emoji": "🎭", "abilities": [], "tip": "Вернуть свою карту с поля в руку"}
+      ]
+    },
+    "nilfgaard": {
+      "name": "Нильфгаард",
+      "icon": "⚜️",
+      "ability": "Победа при ничье в раунде",
+      "leaders": [
+        {"id": "emhyr_royal", "name": "Эмгыр: Белое Пламя", "icon": "🔥", "power": "Подсмотреть руку врага (3 карты)", "key": "peek_hand"},
+        {"id": "emhyr_emperor", "name": "Эмгыр: Непреклонный", "icon": "👑", "power": "Отмена хода врага (пропустить ход)", "key": "cancel_pass"},
+        {"id": "emhyr_relentless", "name": "Эмгыр: Безжалостный", "icon": "⚔️", "power": "Уничтожить сильнейший незащищённый отряд", "key": "scorch_weakest"}
+      ],
+      "cards": [
+        {"id": "gethman", "name": "Гетьман", "val": 12, "type": "hero", "row": "melee", "emoji": "⚜", "abilities": [], "tip": "Герой"},
+        {"id": "morvran", "name": "Морвран Воорхис", "val": 10, "type": "hero", "row": "ranged", "emoji": "🎖️", "abilities": [], "tip": "Герой"},
+        {"id": "ciri_nil", "name": "Цири", "val": 15, "type": "hero", "row": "melee", "emoji": "⚡", "abilities": [], "tip": "Герой"},
+        {"id": "vattier", "name": "Ваттье де Ридо", "val": 4, "type": "spy", "row": "melee", "emoji": "🕵️", "abilities": [], "tip": "Шпион"},
+        {"id": "stefan", "name": "Стефан Скеллен", "val": 9, "type": "spy", "row": "melee", "emoji": "🕵️", "abilities": [], "tip": "Шпион"},
+        {"id": "impera1", "name": "Бригада Импера (1)", "val": 3, "type": "normal", "row": "melee", "emoji": "🛡️", "abilities": ["bond"], "tip": "Прочная связь"},
+        {"id": "impera2", "name": "Бригада Импера (2)", "val": 3, "type": "normal", "row": "melee", "emoji": "🛡️", "abilities": ["bond"], "tip": "Прочная связь"},
+        {"id": "nauzicaa1", "name": "Кавалерия Наузикаа (1)", "val": 2, "type": "normal", "row": "melee", "emoji": "🐴", "abilities": ["bond"], "tip": "Прочная связь"},
+        {"id": "nauzicaa2", "name": "Кавалерия Наузикаа (2)", "val": 2, "type": "normal", "row": "melee", "emoji": "🐴", "abilities": ["bond"], "tip": "Прочная связь"},
+        {"id": "kagyr", "name": "Кагыр", "val": 6, "type": "normal", "row": "melee", "emoji": "⚔️", "abilities": [], "tip": ""},
+        {"id": "rotten", "name": "Гнилой Данделион", "val": 4, "type": "normal", "row": "ranged", "emoji": "🎻", "abilities": ["morale"], "tip": "Прилив сил: +1 всем в ряду"},
+        {"id": "siegemaster", "name": "Осадный мастер", "val": 6, "type": "normal", "row": "siege", "emoji": "⚙️", "abilities": ["morale"], "tip": "Прилив сил"},
+        {"id": "nil_frost", "name": "Мороз", "val": 0, "type": "weather", "row": "melee", "emoji": "❄️", "abilities": [], "tip": "Снижает рукопашные до 1"},
+        {"id": "nil_fog", "name": "Мгла", "val": 0, "type": "weather", "row": "ranged", "emoji": "🌫️", "abilities": [], "tip": "Снижает дальнобойные до 1"},
+        {"id": "nil_rain", "name": "Дождь", "val": 0, "type": "weather", "row": "siege", "emoji": "🌧️", "abilities": [], "tip": "Снижает осадные до 1"},
+        {"id": "nil_clear", "name": "Ясная погода", "val": 0, "type": "weather", "row": "any", "emoji": "☀️", "abilities": ["clear"], "tip": "Снимает всю погоду"},
+        {"id": "nil_horn", "name": "Командирский рог", "val": 0, "type": "horn", "row": "any", "emoji": "📯", "abilities": [], "tip": "Удваивает ряд"},
+        {"id": "nil_decoy", "name": "Чучело", "val": 0, "type": "decoy", "row": "any", "emoji": "🎭", "abilities": [], "tip": "Вернуть карту с поля в руку"},
+        {"id": "nil_catapult", "name": "Катапульта", "val": 8, "type": "normal", "row": "siege", "emoji": "💥", "abilities": [], "tip": ""},
+        {"id": "nil_medic", "name": "Ниlfгаардский лекарь", "val": 5, "type": "normal", "row": "siege", "emoji": "⚕️", "abilities": ["medic"], "tip": "Медик: воскрешает карту"}
+      ]
+    }
+  },
+  "rules": {
+    "hand_size": 10,
+    "mulligan_max": 2,
+    "rounds_to_win": 2,
+    "rows": ["melee", "ranged", "siege"],
+    "row_labels": {"melee": "Рукопашный ⚔️", "ranged": "Дальнобойный 🏹", "siege": "Осадный 💣"}
+  }
+}
