@@ -965,12 +965,13 @@ async def handle_leader_pick(bot: Bot, chat_id: int, user_id: int,
     set_user_setup(user_id, setup)
 
     leader = data["factions"][faction_key]["leaders"][leader_idx]
-    await bot.send_message(
-        chat_id,
-        f"{leader['icon']} *{leader['name']}*\n_{leader['power']}_\n\n"
-        f"⏳ Ожидаем выбор противника...",
-        parse_mode="Markdown"
-    )
+    if not setup.get("ai_difficulty"):
+        await bot.send_message(
+            chat_id,
+            f"{leader['icon']} *{leader['name']}*\n_{leader['power']}_\n\n"
+            f"⏳ Ожидаем выбор противника...",
+            parse_mode="Markdown"
+        )
 
     # AI-игра или PvP?
     if setup.get("ai_difficulty"):

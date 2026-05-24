@@ -1,6 +1,6 @@
 content = open('index.py', encoding='utf-8').read()
-old = '    await start_turn(bot, gs, game_id, opp)\n\n\nasync de'
-new = '    if gs.get("is_ai_game") and opp == "p2":\n        await do_ai_turn(bot, gs, game_id, data)\n    else:\n        await start_turn(bot, gs, game_id, opp)\n\n\nasync de'
+old = '    leader = data["factions"][faction_key]["leaders"][leader_idx]\n    await bot.send_message(\n        chat_id,\n        f"{leader[\'icon\']} *{leader[\'name\']}*\\n_{leader[\'power\']}_\\n\\n"\n        f"⏳ Ожидаем выбор противника...",\n        parse_mode="Markdown"\n    )'
+new = '    leader = data["factions"][faction_key]["leaders"][leader_idx]\n    if not setup.get("ai_difficulty"):\n        await bot.send_message(\n            chat_id,\n            f"{leader[\'icon\']} *{leader[\'name\']}*\\n_{leader[\'power\']}_\\n\\n"\n            f"⏳ Ожидаем выбор противника...",\n            parse_mode="Markdown"\n        )'
 if old in content:
     open('index.py', 'w', encoding='utf-8').write(content.replace(old, new))
     print('Fixed')
