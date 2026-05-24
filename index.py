@@ -1133,6 +1133,13 @@ async def handle_mulligan_done(bot: Bot, chat_id: int, user_id: int,
         return
 
     if gs["phase"] == "mulligan_p1" and side == "p1":
+        if gs.get("is_ai_game"):
+            gs["phase"] = "play"
+            gs["turn"] = "p1"
+            save_game(game_id, gs)
+            await bot.send_message(chat_id, "✅ Готов! Игра начинается!")
+            await start_turn(bot, gs, game_id, "p1")
+            return
         gs["phase"] = "mulligan_p2"
         save_game(game_id, gs)
 
