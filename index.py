@@ -81,6 +81,167 @@ def redis_del(key: str):
 ROWS = ["melee", "ranged", "siege"]
 ROW_EMOJI = {"melee": "⚔️", "ranged": "🏹", "siege": "💣"}
 
+# ─────────────────────────────────────────────
+# AI ENGINE
+# ─────────────────────────────────────────────
+
+AI_USER_ID = 0
+AI_NAME_BY_DIFFICULTY = {
+    "easy":   "🤖 Новичок",
+    "medium": "⚔️ Ветеран",
+    "hard":   "💀 Легенда",
+}
+
+
+def ai_choose_card(gs: dict, side: str, difficulty: str) -> tuple[str, str]:
+    """Выбирает карту и ряд для хода AI."""
+    hand = gs["hand"][side]
+    if not hand:
+        return None, None
+
+    opp = get_opponent(side)
+    scores = calc_scores(gs)
+    my_score = scores[side]
+    opp_score = scores[opp]
+
+    # ── EASY: случайная карта в случайный ряд ──
+    if difficulty == "easy":
+        card = random.choice(hand)
+        return card["uid"], _valid_row(card)
+
+    # ── MEDIUM: базовая логика ──
+    if difficulty == "medium":
+        spies = [c for c in hand if c["type"] == "spy"]
+        if spies:
+            return spies[0]["uid"], _valid_row(spies[0])
+
+        if opp_score > my_score + 10:
+            weather = [c for c in hand if c["type"] == "weather"
+                       and "clear" not in c.get("abilities", [])]
+            if weather:
+                return weather[0]["uid"], _valid_row(weather[0])
+
+        playable = [c for c in hand if c["type"] not in ("weather", "horn", "decoy")]
+        if playable:
+            card = max(playable, key=lambda c: c["val"])
+            return card["uid"], _valid_row(card)
+
+        card = random.choice(hand)
+        return card["uid"], _valid_row(card)
+
+    # ── HARD: продвинутая логика ──
+    if difficulty == "hard":
+        # 1. Шпион — всегда первым (бесплатные 2 карты)
+        spies = [c for c in hand if c["type"] == "spy"]
+        if spies:
+            return spies[0]["uid"], _valid_row(spies[0])
+
+        # 2. Медик если есть сильные карты в отбое
+        medics = [c for c in hand if "medic" in c.get("abilities", [])]
+        good_grave = [c for c in gs["graveyard"][side]
+                      if c["val"] >= 5 and c["type"] != "hero"]
+        if medics and good_grave:
+            return medics[0]["uid"], _valid_row(medics[0])
+
+        # 3. Казнь если у врага сильная карта
+        opp_max = max(
+            (c["val"] for r in ROWS for c in gs["rows"][opp][r]
+             if c["type"] != "hero"),
+            default=0
+        )
+        if opp_max >= 7:
+            kazn = [c for c in hand if "kazn" in c.get("abilities", [])]
+            if kazn:
+                return kazn[0]["uid"], _valid_row(kazn[0])
+
+        # 4. Погода если противник сильно впереди
+        if opp_score > my_score + 15:
+            weather = [c for c in hand
+                       if c["type"] == "weather"
+                       and "clear" not in c.get("abilities", [])]
+            if weather:
+                best_row = max(ROWS, key=lambda r: calc_row_score(
+                    gs["rows"][opp][r], gs["horns"][opp][r], gs["wx"][r]
+                ))
+                row_weather = [c for c in weather if c.get("row") == best_row]
+                card = row_weather[0] if row_weather else weather[0]
+                return card["uid"], _valid_row(card)
+
+        # 5. Прочная связь — играем пары
+        bond_ids: dict[str, list] = {}
+        for c in hand:
+            if "bond" in c.get("abilities", []):
+                bond_ids.setdefault(c["id"], []).append(c)
+        for bond_cards in bond_ids.values():
+            if len(bond_cards) >= 2:
+                return bond_cards[0]["uid"], _valid_row(bond_cards[0])
+
+        # 6. Рог если ряд большой
+        horns = [c for c in hand if c["type"] == "horn"]
+        if horns:
+            best_row = max(ROWS, key=lambda r: len(gs["rows"][side][r]))
+            if (len(gs["rows"][side][best_row]) >= 3
+                    and not gs["horns"][side][best_row]):
+                return horns[0]["uid"], best_row
+
+        # 7. Сильнейшая обычная карта
+        playable = [c for c in hand if c["type"] not in ("weather", "horn", "decoy")]
+        if playable:
+            card = max(playable, key=lambda c: c["val"])
+            return card["uid"], _valid_row(card)
+
+        card = random.choice(hand)
+        return card["uid"], _valid_row(card)
+
+    return None, None
+
+
+def ai_should_pass(gs: dict, side: str, difficulty: str) -> bool:
+    """Решает — пасовать ли AI в этот момент."""
+    opp = get_opponent(side)
+    scores = calc_scores(gs)
+    my_score = scores[side]
+    opp_score = scores[opp]
+    hand_size = len(gs["hand"][side])
+
+    if difficulty == "easy":
+        return my_score > opp_score and random.random() < 0.2
+
+    if difficulty == "medium":
+        if gs["passed"][opp] and my_score > opp_score:
+            return True
+        if my_score > opp_score + 5 and hand_size <= 3:
+            return True
+        return False
+
+    if difficulty == "hard":
+        if gs["passed"][opp] and my_score > opp_score:
+            return True
+        if my_score > opp_score + 20 and hand_size <= 4:
+            return True
+        if hand_size <= 2 and my_score < opp_score:
+            return True
+        return False
+
+    return False
+
+
+def _valid_row(card: dict) -> str:
+    """Возвращает корректный ряд для карты."""
+    row = card.get("row", "melee")
+    if row == "any" or row not in ROWS:
+        return "melee"
+    return row
+
+
+def ai_pick_medic(gs: dict, side: str) -> str | None:
+    """AI выбирает лучшую карту для воскрешения медиком."""
+    grave = [c for c in gs["graveyard"][side]
+             if c["type"] not in ("weather", "horn", "decoy")]
+    if not grave:
+        return None
+    return max(grave, key=lambda c: c["val"])["uid"]
+
 
 def uid_card(card: dict, idx: int) -> dict:
     """Give each card a unique uid for tracking."""
@@ -484,9 +645,16 @@ def _render_row_cards(cards: list[dict], wx: bool) -> str:
 
 def kb_main_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("⚔️ Найти игру", callback_data="find_game")],
-        [InlineKeyboardButton("📚 Правила",    callback_data="rules")],
-        [InlineKeyboardButton("🃏 Фракции",    callback_data="factions")],
+        [InlineKeyboardButton("👤 Играть с человеком",    callback_data="find_game")],
+        [InlineKeyboardButton("🤖 Играть с компьютером", callback_data="vs_ai")],
+        [InlineKeyboardButton("📚 Правила",               callback_data="rules")],
+        [InlineKeyboardButton("🃏 Фракции",               callback_data="factions")],
+    ])
+def kb_difficulty() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🟢 Новичок — случайные ходы",  callback_data="ai_diff:easy")],
+        [InlineKeyboardButton("🟡 Ветеран — базовая тактика", callback_data="ai_diff:medium")],
+        [InlineKeyboardButton("🔴 Легенда — полная стратегия",callback_data="ai_diff:hard")],
     ])
 
 
@@ -804,15 +972,61 @@ async def handle_leader_pick(bot: Bot, chat_id: int, user_id: int,
         parse_mode="Markdown"
     )
 
-    # Check if opponent is also ready
-    opp_id = setup["opponent_id"]
-    opp_setup = get_user_setup(opp_id)
+    # AI-игра или PvP?
+    if setup.get("ai_difficulty"):
+        await launch_ai_game(bot, user_id, user_name, setup,
+                             faction_key, leader_idx, data)
+    else:
+        opp_id = setup["opponent_id"]
+        opp_setup = get_user_setup(opp_id)
+        if opp_setup and opp_setup.get("faction") and opp_setup.get("leader_idx") is not None:
+            await launch_game(bot, user_id, opp_id, setup, opp_setup, data)
 
-    if opp_setup and opp_setup.get("faction") and opp_setup.get("leader_idx") is not None:
-        # Both ready — launch game
-        await launch_game(bot, user_id, opp_id, setup, opp_setup, data)
 
+async def launch_ai_game(bot: Bot, user_id: int, user_name: str,
+                         setup: dict, faction_key: str, leader_idx: int,
+                         data: dict):
+    """Запускает игру против AI."""
+    difficulty = setup.get("ai_difficulty", "medium")
+    ai_name = AI_NAME_BY_DIFFICULTY[difficulty]
 
+    ai_faction = random.choice(list(data["factions"].keys()))
+    ai_leader_idx = random.randint(
+        0, len(data["factions"][ai_faction]["leaders"]) - 1
+    )
+
+    game_id = hashlib.md5(
+        f"{user_id}_ai_{random.random()}".encode()
+    ).hexdigest()[:12]
+
+    gs = create_game(
+        user_id, user_name,
+        AI_USER_ID, ai_name,
+        faction_key, ai_faction,
+        leader_idx, ai_leader_idx,
+        data
+    )
+    gs["is_ai_game"] = True
+    gs["ai_difficulty"] = difficulty
+    gs["phase"] = "play"
+    gs["turn"] = "p1"
+
+    save_game(game_id, gs)
+    set_user_game_id(user_id, game_id)
+
+    ai_faction_name = data["factions"][ai_faction]["name"]
+    ai_leader_name = data["factions"][ai_faction]["leaders"][ai_leader_idx]["name"]
+
+    await bot.send_message(
+        user_id,
+        f"🎮 *Игра против {ai_name}!*\n\n"
+        f"Фракция противника: {ai_faction_name}\n"
+        f"Лидер: {ai_leader_name}\n\n"
+        f"Муллиган: замените до 2 карт из руки.",
+        reply_markup=kb_mulligan(gs["hand"]["p1"]),
+        parse_mode="Markdown"
+    )
+    
 async def launch_game(bot: Bot, user_a_id: int, user_b_id: int,
                       setup_a: dict, setup_b: dict, data: dict):
     """Create game and start mulligan phase."""
@@ -939,6 +1153,13 @@ async def handle_mulligan_done(bot: Bot, chat_id: int, user_id: int,
         await bot.send_message(chat_id, "✅ Готов! Игра начинается!")
         await start_turn(bot, gs, game_id, "p1")
 
+    elif gs.get("is_ai_game") and gs["phase"] == "mulligan_p1" and side == "p1":
+        gs["phase"] = "play"
+        gs["turn"] = "p1"
+        save_game(game_id, gs)
+        await bot.send_message(chat_id, "✅ Готов! Игра начинается!")
+        await start_turn(bot, gs, game_id, "p1")
+
 
 async def start_turn(bot: Bot, gs: dict, game_id: str, side: str):
     """Send board + hand keyboard to the active player."""
@@ -1052,7 +1273,10 @@ async def handle_place_card(bot: Bot, chat_id: int, user_id: int,
 
     # Continue game
     next_side = gs["turn"]
-    await start_turn(bot, gs, game_id, next_side)
+    if gs.get("is_ai_game") and next_side == "p2":
+        await do_ai_turn(bot, gs, game_id, load_data())
+    else:
+        await start_turn(bot, gs, game_id, next_side)
 
 
 async def handle_pass(bot: Bot, chat_id: int, user_id: int,
@@ -1088,7 +1312,10 @@ async def handle_pass(bot: Bot, chat_id: int, user_id: int,
     await bot.send_message(chat_id, "✋ Вы спасовали. Ждём противника...")
     await bot.send_message(opp_id,
                            f"✋ {p_name} спасовал(а). Ваш ход — можете продолжить или тоже спасовать.")
-    await start_turn(bot, gs, game_id, opp)
+    if gs.get("is_ai_game") and opp == "p2":
+        await do_ai_turn(bot, gs, game_id, data)
+    else:
+        await start_turn(bot, gs, game_id, opp)
 
 
 async def handle_medic(bot: Bot, chat_id: int, user_id: int,
@@ -1131,6 +1358,86 @@ async def handle_medic(bot: Bot, chat_id: int, user_id: int,
     await start_turn(bot, gs, game_id, gs["turn"])
 
 
+async def do_ai_turn(bot: Bot, gs: dict, game_id: str, data: dict):
+    """AI делает ход автоматически."""
+    side = "p2"
+    difficulty = gs.get("ai_difficulty", "medium")
+
+    await asyncio.sleep(1.2)  # пауза для реалистичности
+
+    # Пасовать?
+    if not gs["passed"][side] and ai_should_pass(gs, side, difficulty):
+        gs["passed"][side] = True
+        add_log(gs, f"✋ {gs['players'][side]['name']} спасовал(а)")
+        save_game(game_id, gs)
+
+        p1_id = gs["players"]["p1"]["id"]
+        await bot.send_message(
+            p1_id,
+            f"✋ *{gs['players']['p2']['name']}* спасовал(а)!\n"
+            f"Ваш ход — продолжите или тоже спасуйте.",
+            parse_mode="Markdown"
+        )
+
+        if check_round_end(gs):
+            await end_round(bot, gs, game_id, data)
+            return
+
+        gs["turn"] = "p1"
+        save_game(game_id, gs)
+        await start_turn(bot, gs, game_id, "p1")
+        return
+
+    # Выбрать карту
+    card_uid, row = ai_choose_card(gs, side, difficulty)
+    if not card_uid:
+        gs["passed"][side] = True
+        save_game(game_id, gs)
+        if check_round_end(gs):
+            await end_round(bot, gs, game_id, data)
+            return
+        gs["turn"] = "p1"
+        save_game(game_id, gs)
+        await start_turn(bot, gs, game_id, "p1")
+        return
+
+    ok, msg = apply_card(gs, side, card_uid, row, data)
+    if ok:
+        add_log(gs, f"{gs['players'][side]['name']}: {msg}")
+
+    # Медик AI
+    if gs["awaiting_medic"].get(side):
+        revive_uid = ai_pick_medic(gs, side)
+        if revive_uid:
+            grave = gs["graveyard"][side]
+            card = next((c for c in grave if c["uid"] == revive_uid), None)
+            if card:
+                gs["graveyard"][side] = [
+                    c for c in grave if c["uid"] != revive_uid
+                ]
+                r = card.get("row", "melee")
+                if r not in ROWS:
+                    r = "melee"
+                gs["rows"][side][r].append(card)
+        gs["awaiting_medic"][side] = False
+
+    if not gs["passed"]["p1"]:
+        gs["turn"] = "p1"
+    save_game(game_id, gs)
+
+    p1_id = gs["players"]["p1"]["id"]
+    await bot.send_message(
+        p1_id,
+        f"🤖 Компьютер сыграл: {msg}",
+        parse_mode="Markdown"
+    )
+
+    if check_round_end(gs):
+        await end_round(bot, gs, game_id, data)
+        return
+
+    await start_turn(bot, gs, game_id, "p1")
+    
 async def end_round(bot: Bot, gs: dict, game_id: str, data: dict):
     result_msg = resolve_round(gs, data)
     save_game(game_id, gs)
@@ -1301,6 +1608,27 @@ async def process_update(update_data: dict):
         if cbd == "find_game":
             await handle_find_game(bot, chat_id, user_id, user_name, data)
 
+        elif cbd == "vs_ai":
+            await bot.send_message(
+                chat_id,
+                "🤖 *Игра против компьютера*\n\nВыберите уровень сложности:",
+                reply_markup=kb_difficulty(),
+                parse_mode="Markdown"
+            )
+
+        elif cbd.startswith("ai_diff:"):
+            difficulty = cbd.split(":")[1]
+            diff_name = AI_NAME_BY_DIFFICULTY.get(difficulty, "AI")
+            setup = get_user_setup(user_id) or {}
+            setup["my_name"] = user_name
+            setup["ai_difficulty"] = difficulty
+            set_user_setup(user_id, setup)
+            await bot.send_message(
+                chat_id,
+                f"Противник: *{diff_name}*\n\nВыберите фракцию:",
+                reply_markup=kb_faction_select(data),
+                parse_mode="Markdown"
+            )
         elif cbd == "rules":
             await handle_rules(bot, chat_id)
 
