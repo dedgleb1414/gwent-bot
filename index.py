@@ -698,6 +698,7 @@ def kb_hand(gs: dict, side: str) -> InlineKeyboardMarkup:
 
     # Pass button
     rows.append([InlineKeyboardButton("✋ Пас", callback_data="pass_round")])
+    rows.append([InlineKeyboardButton("🏳️ Сдаться", callback_data="surrender")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -1493,6 +1494,38 @@ async def end_round(bot: Bot, gs: dict, game_id: str, data: dict):
         await bot.send_message(pid_opp, "⏳ Ждём противника (муллиган)...")
 
 
+async def handle_surrender(bot: Bot, chat_id: int, user_id: int, game_id: str):
+    """Игрок сдаётся."""
+    gs = get_game(game_id)
+    if not gs:
+        return
+
+    side = get_side_for_user(gs, user_id)
+    if not side:
+        return
+
+    opp = get_opponent(side)
+    p_name = gs["players"][side]["name"]
+    opp_name = gs["players"][opp]["name"]
+    opp_id = gs["players"][opp]["id"]
+
+    redis_del(game_key(game_id))
+    redis_del(user_game_key(user_id))
+
+    await bot.send_message(
+        chat_id,
+        f"Вы сдались. {opp_name} побеждает! /start - новая игра",
+    )
+    if opp_id != AI_USER_ID:
+        await bot.send_message(
+            opp_id,
+            f"{p_name} сдался! Вы победили! /start - новая игра",
+
+
+        )
+        redis_del(user_game_key(opp_id))
+
+
 async def handle_game_view(bot: Bot, chat_id: int, user_id: int):
     game_id = get_user_game_id(user_id)
     if not game_id:
@@ -1699,6 +1732,9 @@ async def process_update(update_data: dict):
             # ── Pass ──
             elif cbd == "pass_round":
                 await handle_pass(bot, chat_id, user_id, game_id, data)
+
+            elif cbd == "surrender":
+                await handle_surrender(bot, chat_id, user_id, game_id)
 
             # ── Medic ──
             elif cbd.startswith("medic:"):
