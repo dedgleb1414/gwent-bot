@@ -955,7 +955,7 @@ async def handle_faction_pick(bot: Bot, chat_id: int, user_id: int,
 
 
 async def handle_leader_pick(bot: Bot, chat_id: int, user_id: int,
-                             faction_key: str, leader_idx: int, data: dict):
+                             user_name: str, faction_key: str, leader_idx: int, data: dict):
     setup = get_user_setup(user_id)
     if not setup:
         await bot.send_message(chat_id, "❌ Сессия устарела.")
@@ -1646,7 +1646,7 @@ async def process_update(update_data: dict):
             parts = cbd.split(":")
             faction_key = parts[1]
             leader_idx = int(parts[2])
-            await handle_leader_pick(bot, chat_id, user_id,
+            await handle_leader_pick(bot, chat_id, user_id, user_name,
                                      faction_key, leader_idx, data)
 
         else:

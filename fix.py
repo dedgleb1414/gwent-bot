@@ -1,6 +1,6 @@
 content = open('index.py', encoding='utf-8').read()
-old = '    leader = data["factions"][faction_key]["leaders"][leader_idx]\n    await bot.send_message(\n        chat_id,\n        f"{leader[\'icon\']} *{leader[\'name\']}*\\n_{leader[\'power\']}_\\n\\n"\n        f"⏳ Ожидаем выбор противника...",\n        parse_mode="Markdown"\n    )'
-new = '    leader = data["factions"][faction_key]["leaders"][leader_idx]\n    if not setup.get("ai_difficulty"):\n        await bot.send_message(\n            chat_id,\n            f"{leader[\'icon\']} *{leader[\'name\']}*\\n_{leader[\'power\']}_\\n\\n"\n            f"⏳ Ожидаем выбор противника...",\n            parse_mode="Markdown"\n        )'
+old = '            await handle_leader_pick(bot, chat_id, user_id,\n                                     faction_key, leader_idx, data)'
+new = '            await handle_leader_pick(bot, chat_id, user_id, user_name,\n                                     faction_key, leader_idx, data)'
 if old in content:
     open('index.py', 'w', encoding='utf-8').write(content.replace(old, new))
     print('Fixed')
