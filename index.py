@@ -1699,6 +1699,8 @@ async def process_update(update_data: dict):
             # ── Mulligan ──
             if cbd.startswith("mulligan:"):
                 card_uid = cbd.split(":", 1)[1]
+                gs_debug = get_game(game_id)
+                print(f"DEBUG mulligan: phase={gs_debug and gs_debug.get('phase')}, side={get_side_for_user(gs_debug, user_id) if gs_debug else None}")
                 await handle_mulligan(bot, chat_id, user_id, card_uid, game_id, data)
 
             elif cbd == "mulligan_done":
