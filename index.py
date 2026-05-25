@@ -1259,16 +1259,19 @@ async def handle_card_select(bot: Bot, chat_id: int, user_id: int,
     save_game(game_id, gs)
 
     ctype = card["type"]
-    # Spy, weather, decoy: still need row choice (or auto-place)
     if ctype in ("normal", "hero", "spy", "horn", "weather", "decoy"):
-        await bot.send_message(
+        msg = await bot.send_message(
             chat_id,
             f"Выбрана: {card['emoji']} *{card['name']}*\n_{card.get('tip','')}_\n\nКуда поставить?",
             reply_markup=kb_row_select(card_uid, card),
             parse_mode="Markdown"
         )
+        gs.setdefault("tmp_msg_id", {})[side] = msg.message_id
+        save_game(game_id, gs)
     else:
-        await bot.send_message(chat_id, f"Выбрана карта: {card['name']}")
+        msg = await bot.send_message(chat_id, f"Выбрана карта: {card['name']}")
+        gs.setdefault("tmp_msg_id", {})[side] = msg.message_id
+        save_game(game_id, gs)
 
 
 async def handle_place_card(bot: Bot, chat_id: int, user_id: int,
@@ -1281,6 +1284,15 @@ async def handle_place_card(bot: Bot, chat_id: int, user_id: int,
     if not side or gs["turn"] != side:
         await bot.send_message(chat_id, "⏳ Сейчас не ваш ход.")
         return
+
+    # Удаляем уточняющее сообщение
+    tmp_id = gs.get("tmp_msg_id", {}).get(side)
+    if tmp_id:
+        try:
+            await bot.delete_message(chat_id=chat_id, message_id=tmp_id)
+        except Exception:
+            pass
+        gs.setdefault("tmp_msg_id", {})[side] = None
 
     gdata = load_data()
     ok, msg = apply_card(gs, side, card_uid, row, gdata)
@@ -1315,14 +1327,13 @@ async def handle_place_card(bot: Bot, chat_id: int, user_id: int,
 
     save_game(game_id, gs)
 
-    await bot.send_message(chat_id, f"✅ {msg}")
-
     # Check round end
     if check_round_end(gs):
         await end_round(bot, gs, game_id, gdata)
         return
 
     # Continue game
+    gs = get_game(game_id)  # перечитываем свежий gs из Redis
     next_side = gs["turn"]
     if gs.get("is_ai_game") and next_side == "p2":
         await do_ai_turn(bot, gs, game_id, load_data())
@@ -1475,13 +1486,6 @@ async def do_ai_turn(bot: Bot, gs: dict, game_id: str, data: dict):
     if not gs["passed"]["p1"]:
         gs["turn"] = "p1"
     save_game(game_id, gs)
-
-    p1_id = gs["players"]["p1"]["id"]
-    await bot.send_message(
-        p1_id,
-        f"🤖 Компьютер сыграл: {msg}",
-        parse_mode="Markdown"
-    )
 
     if check_round_end(gs):
         await end_round(bot, gs, game_id, data)
