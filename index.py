@@ -1010,7 +1010,7 @@ async def launch_ai_game(bot: Bot, user_id: int, user_name: str,
     )
     gs["is_ai_game"] = True
     gs["ai_difficulty"] = difficulty
-    gs["phase"] = "play"
+    gs["phase"] = "mulligan_p1"
     gs["turn"] = "p1"
 
     save_game(game_id, gs)
