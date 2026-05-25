@@ -839,6 +839,16 @@ async def handle_start(bot: Bot, chat_id: int, user_id: int,
                            parse_mode="Markdown")
 
 
+async def delete_msg(bot, chat_id, message_id):
+    """Тихо удаляет сообщение."""
+    if not message_id:
+        return
+    try:
+        await bot.delete_message(chat_id=chat_id, message_id=message_id)
+    except Exception:
+        pass
+
+
 async def handle_find_game(bot: Bot, chat_id: int, user_id: int,
                            user_name: str, data: dict):
     # Check if already in game
@@ -935,7 +945,7 @@ async def handle_join_lobby(bot: Bot, chat_id: int, user_id: int,
 
 
 async def handle_faction_pick(bot: Bot, chat_id: int, user_id: int,
-                              faction_key: str, data: dict):
+                              faction_key: str, data: dict, prev_msg_id: int = None):
     setup = get_user_setup(user_id)
     if not setup:
         await bot.send_message(chat_id, "❌ Сессия устарела. Начни заново: /start")
@@ -944,8 +954,10 @@ async def handle_faction_pick(bot: Bot, chat_id: int, user_id: int,
     setup["faction"] = faction_key
     set_user_setup(user_id, setup)
 
+    await delete_msg(bot, chat_id, prev_msg_id)
+
     faction = data["factions"][faction_key]
-    await bot.send_message(
+    msg = await bot.send_message(
         chat_id,
         f"{faction['icon']} *{faction['name']}*\n\n"
         f"Особенность: _{faction['ability']}_\n\n"
@@ -953,10 +965,13 @@ async def handle_faction_pick(bot: Bot, chat_id: int, user_id: int,
         reply_markup=kb_leader_select(faction_key, data),
         parse_mode="Markdown"
     )
+    setup["last_msg_id"] = msg.message_id
+    set_user_setup(user_id, setup)
 
 
 async def handle_leader_pick(bot: Bot, chat_id: int, user_id: int,
-                             user_name: str, faction_key: str, leader_idx: int, data: dict):
+                             user_name: str, faction_key: str, leader_idx: int, data: dict,
+                             prev_msg_id: int = None):
     setup = get_user_setup(user_id)
     if not setup:
         await bot.send_message(chat_id, "❌ Сессия устарела.")
@@ -964,6 +979,8 @@ async def handle_leader_pick(bot: Bot, chat_id: int, user_id: int,
 
     setup["leader_idx"] = leader_idx
     set_user_setup(user_id, setup)
+
+    await delete_msg(bot, chat_id, prev_msg_id)
 
     leader = data["factions"][faction_key]["leaders"][leader_idx]
     if not setup.get("ai_difficulty"):
@@ -1115,12 +1132,16 @@ async def handle_mulligan(bot: Bot, chat_id: int, user_id: int,
     save_game(game_id, gs)
 
     swaps = gs["mulligan_swaps"][side]
-    await bot.send_message(
+    prev_mid = gs.get("mulligan_msg_id", {}).get(side)
+    await delete_msg(bot, chat_id, prev_mid)
+    msg = await bot.send_message(
         chat_id,
         f"🔄 Замена {swaps}/2: {card['name']} → {new_card['emoji']}{new_card['name']}\n\n"
         f"{'Ещё можно заменить 1 карту.' if swaps < 2 else 'Лимит замен исчерпан.'}",
         reply_markup=kb_mulligan(gs["hand"][side]),
     )
+    gs.setdefault("mulligan_msg_id", {})[side] = msg.message_id
+    save_game(game_id, gs)
 
 
 async def handle_mulligan_done(bot: Bot, chat_id: int, user_id: int,
@@ -1696,26 +1717,33 @@ async def process_update(update_data: dict):
             await handle_find_game(bot, chat_id, user_id, user_name, data)
 
         elif cbd == "vs_ai":
-            await bot.send_message(
+            msg = await bot.send_message(
                 chat_id,
                 "🤖 *Игра против компьютера*\n\nВыберите уровень сложности:",
                 reply_markup=kb_difficulty(),
                 parse_mode="Markdown"
             )
+            setup = get_user_setup(user_id) or {}
+            setup["last_msg_id"] = msg.message_id
+            set_user_setup(user_id, setup)
 
         elif cbd.startswith("ai_diff:"):
             difficulty = cbd.split(":")[1]
             diff_name = AI_NAME_BY_DIFFICULTY.get(difficulty, "AI")
             setup = get_user_setup(user_id) or {}
+            prev_msg_id = setup.get("last_msg_id")
+            await delete_msg(bot, chat_id, prev_msg_id)
             setup["my_name"] = user_name
             setup["ai_difficulty"] = difficulty
             set_user_setup(user_id, setup)
-            await bot.send_message(
+            msg = await bot.send_message(
                 chat_id,
                 f"Противник: *{diff_name}*\n\nВыберите фракцию:",
                 reply_markup=kb_faction_select(data),
                 parse_mode="Markdown"
             )
+            setup["last_msg_id"] = msg.message_id
+            set_user_setup(user_id, setup)
         elif cbd == "rules":
             await handle_rules(bot, chat_id)
 
@@ -1725,15 +1753,19 @@ async def process_update(update_data: dict):
         # ── Faction select ──
         elif cbd.startswith("faction:"):
             faction_key = cbd.split(":")[1]
-            await handle_faction_pick(bot, chat_id, user_id, faction_key, data)
+            setup = get_user_setup(user_id) or {}
+            prev_msg_id = setup.get("last_msg_id")
+            await handle_faction_pick(bot, chat_id, user_id, faction_key, data, prev_msg_id)
 
         # ── Leader select ──
         elif cbd.startswith("leader:"):
             parts = cbd.split(":")
             faction_key = parts[1]
             leader_idx = int(parts[2])
+            setup2 = get_user_setup(user_id) or {}
+            prev_msg_id2 = setup2.get("last_msg_id")
             await handle_leader_pick(bot, chat_id, user_id, user_name,
-                                     faction_key, leader_idx, data)
+                                     faction_key, leader_idx, data, prev_msg_id2)
 
         else:
             # All following require an active game
