@@ -1886,10 +1886,9 @@ async def process_update(update_data: dict):
                         await delete_msg(bot, chat_id, tmp_id)
                         gs.setdefault("tmp_msg_id", {})[side] = None
                         save_game(game_id, gs)
-                await bot.send_message(
-                    chat_id, "↩️ Выбор отменён.",
-                    reply_markup=kb_hand(get_game(game_id) or {}, side or "p1")
-                )
+                gs2 = get_game(game_id)
+                if gs2:
+                    await start_turn(bot, gs2, game_id, side)
 
             # ── Place card ──
             elif cbd.startswith("place:"):
