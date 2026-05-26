@@ -1396,7 +1396,6 @@ async def handle_pass(bot: Bot, chat_id: int, user_id: int,
     save_game(game_id, gs)
 
     if gs.get("is_ai_game") and opp == "p2":
-        await bot.send_message(chat_id, "✋ Вы спасовали. AI ходит...")
         await do_ai_turn(bot, gs, game_id, data)
     else:
         await bot.send_message(opp_id,
