@@ -1596,6 +1596,60 @@ async def handle_surrender(bot: Bot, chat_id: int, user_id: int, game_id: str):
         redis_del(user_game_key(opp_id))
 
 
+async def handle_hand(bot: Bot, chat_id: int, user_id: int):
+    """Показывает карты в руке с описанием."""
+    game_id = get_user_game_id(user_id)
+    if not game_id:
+        await bot.send_message(chat_id, "Нет активной игры. /start чтобы начать.")
+        return
+    gs = get_game(game_id)
+    if not gs:
+        await bot.send_message(chat_id, "Игра не найдена. /start")
+        return
+
+    side = get_side_for_user(gs, user_id)
+    if not side:
+        return
+
+    hand = gs["hand"][side]
+    if not hand:
+        await bot.send_message(chat_id, "🃏 Рука пуста.")
+        return
+
+    lines = ["🃏 *Карты в руке:*\n"]
+    for i, card in enumerate(hand, 1):
+        type_icon = {
+            "hero":    "👑 Герой",
+            "spy":     "👁 Шпион",
+            "weather": "🌪 Погода",
+            "horn":    "📯 Рог",
+            "decoy":   "🎭 Чучело",
+            "normal":  "⚔️ Отряд",
+        }.get(card["type"], "")
+
+        row_label = {
+            "melee":  "Рукопашный ⚔️",
+            "ranged": "Дальнобойный 🏹",
+            "siege":  "Осадный 💣",
+            "any":    "Любой ряд",
+        }.get(card.get("row", ""), "")
+
+        val_str = f"Сила: *{card['val']}*  " if card["val"] else ""
+        tip = f"_{card['tip']}_" if card.get("tip") else ""
+
+        lines.append(
+            f"{i}. {card['emoji']} *{card['name']}*\n"
+            f"   {type_icon}  {row_label}\n"
+            f"   {val_str}{tip}\n"
+        )
+
+    await bot.send_message(
+        chat_id,
+        "\n".join(lines),
+        parse_mode="Markdown"
+    )
+
+
 async def handle_game_view(bot: Bot, chat_id: int, user_id: int):
     game_id = get_user_game_id(user_id)
     if not game_id:
@@ -1709,6 +1763,9 @@ async def process_update(update_data: dict):
 
         elif text == "/game" or text == "/board":
             await handle_game_view(bot, chat_id, user_id)
+
+        elif text == "/hand":
+            await handle_hand(bot, chat_id, user_id)
 
         elif text == "/cancel":
             redis_del(queue_key())
