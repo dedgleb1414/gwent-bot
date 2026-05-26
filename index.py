@@ -1330,11 +1330,13 @@ async def handle_place_card(bot: Bot, chat_id: int, user_id: int,
                  if c["type"] not in ("weather", "horn", "decoy")]
         if grave:
             save_game(game_id, gs)
-            await bot.send_message(
+            msg = await bot.send_message(
                 chat_id,
                 f"⚕️ Медик! Выберите карту для воскрешения из отбоя:",
                 reply_markup=kb_medic(grave)
             )
+            gs.setdefault("tmp_msg_id", {})[side] = msg.message_id
+            save_game(game_id, gs)
             return
 
     gs["awaiting_medic"][side] = False
@@ -1397,9 +1399,10 @@ async def handle_pass(bot: Bot, chat_id: int, user_id: int,
         await bot.send_message(chat_id, "✋ Вы спасовали. AI ходит...")
         await do_ai_turn(bot, gs, game_id, data)
     else:
-        await bot.send_message(chat_id, "✋ Вы спасовали. Ждём противника...")
         await bot.send_message(opp_id,
                                f"✋ {p_name} спасовал(а). Ваш ход — можете продолжить или тоже спасовать.")
+        add_log(gs, f"✋ {p_name} спасовал(а)")
+        save_game(game_id, gs)
         await start_turn(bot, gs, game_id, opp)
 
 
@@ -1412,6 +1415,11 @@ async def handle_medic(bot: Bot, chat_id: int, user_id: int,
     side = get_side_for_user(gs, user_id)
     if not side or not gs["awaiting_medic"].get(side):
         return
+
+    # Удаляем сообщение выбора медика
+    tmp_id = gs.get("tmp_msg_id", {}).get(side)
+    await delete_msg(bot, chat_id, tmp_id)
+    gs.setdefault("tmp_msg_id", {})[side] = None
 
     if card_uid == "skip":
         gs["awaiting_medic"][side] = False
@@ -1434,10 +1442,7 @@ async def handle_medic(bot: Bot, chat_id: int, user_id: int,
                         gs["hand"][side].append(new_card)
                         drawn.append(new_card["name"])
                 drawn_str = ", ".join(drawn) if drawn else "нет карт"
-                await bot.send_message(
-                    chat_id,
-                    f"👁 Шпион {card['name']} воскрешён на поле врага! Взято: {drawn_str}"
-                )
+                add_log(gs, f"👁 Шпион {card['name']} воскрешён на поле врага! Взято: {drawn_str}")
             elif "kazn" in card.get("abilities", []):
                 # Дракон воскрешается и сразу убивает сильнейшую карту melee врага
                 row = card.get("row", "melee")
@@ -1456,20 +1461,14 @@ async def handle_medic(bot: Bot, chat_id: int, user_id: int,
                         if c["uid"] != best_card["uid"]
                     ]
                     gs["graveyard"][opp].append(best_card)
-                    await bot.send_message(
-                        chat_id,
-                        f"🐲 {card['name']} воскрешён! Казнь: {best_card['name']} ({best_val}) уничтожен"
-                    )
+                    add_log(gs, f"🐲 {card['name']} воскрешён! Казнь: {best_card['name']} ({best_val}) уничтожен")
             else:
                 row = card.get("row", "melee")
                 if row not in ROWS:
                     row = "melee"
                 gs["rows"][side][row].append(card)
             gs["awaiting_medic"][side] = False
-            await bot.send_message(
-                chat_id,
-                f"⚕️ Воскрешён: {card['emoji']} {card['name']} ({card['val']}) → {ROW_EMOJI[row]}"
-            )
+            add_log(gs, f"⚕️ Воскрешён: {card['emoji']} {card['name']} ({card['val']})")
 
     # Switch turn
     opp = get_opponent(side)
@@ -1502,12 +1501,8 @@ async def do_ai_turn(bot: Bot, gs: dict, game_id: str, data: dict):
         save_game(game_id, gs)
 
         p1_id = gs["players"]["p1"]["id"]
-        await bot.send_message(
-            p1_id,
-            f"✋ *{gs['players']['p2']['name']}* спасовал(а)!\n"
-            f"Ваш ход — продолжите или тоже спасуйте.",
-            parse_mode="Markdown"
-        )
+        add_log(gs, f"✋ {gs['players']['p2']['name']} спасовал(а)")
+        save_game(game_id, gs)
 
         if check_round_end(gs):
             await end_round(bot, gs, game_id, data)
@@ -1618,17 +1613,8 @@ async def end_round(bot: Bot, gs: dict, game_id: str, data: dict):
         gs["phase"] = "play"
         gs["turn"] = "p1"
         save_game(game_id, gs)
-        await bot.send_message(
-            p1_id,
-            f"{result_msg}\n\n⚔️ *Раунд {gs['round']} начинается!*",
-            parse_mode="Markdown"
-        )
-        if p2_id != AI_USER_ID:
-            await bot.send_message(
-                p2_id,
-                f"{result_msg}\n\n⚔️ *Раунд {gs['round']} начинается!*",
-                parse_mode="Markdown"
-            )
+        add_log(gs, f"⚔️ Раунд {gs['round']} начинается!")
+        save_game(game_id, gs)
         if gs.get("is_ai_game"):
             await start_turn(bot, gs, game_id, "p1")
         else:
