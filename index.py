@@ -1619,6 +1619,30 @@ async def handle_game_view(bot: Bot, chat_id: int, user_id: int):
     )
 
 
+async def handle_help(bot: Bot, chat_id: int):
+    text = (
+        "📋 *Команды бота:*\n\n"
+        "/start — главное меню\n"
+        "/game — посмотреть текущее поле\n"
+        "/hand — карты в руке с описанием\n"
+        "/rules — правила игры\n"
+        "/stats — твоя статистика\n"
+        "/cancel — выйти из очереди поиска\n\n"
+        "🎮 *Как играть:*\n\n"
+        "1️⃣ /start → выбери режим игры\n"
+        "2️⃣ Выбери фракцию и лидера\n"
+        "3️⃣ Замени до 2 карт (муллиган)\n"
+        "4️⃣ Нажми карту → выбери ряд\n"
+        "5️⃣ Или нажми ✋ Пас\n"
+        "6️⃣ Победи в 2 из 3 раундов!\n\n"
+        "💡 *Подсказка:* нажми на карту чтобы "
+        "увидеть её способность перед размещением."
+    )
+    await bot.send_message(chat_id, text,
+                           reply_markup=kb_main_menu(),
+                           parse_mode="Markdown")
+
+
 async def handle_rules(bot: Bot, chat_id: int):
     text = (
         "📜 *Правила Гвинта*\n\n"
@@ -1690,7 +1714,10 @@ async def process_update(update_data: dict):
             redis_del(queue_key())
             await bot.send_message(chat_id, "❌ Поиск отменён.")
 
-        elif text == "/help" or text == "/rules":
+        elif text == "/help":
+            await handle_help(bot, chat_id)
+
+        elif text == "/rules":
             await handle_rules(bot, chat_id)
 
         else:
