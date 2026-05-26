@@ -1036,7 +1036,7 @@ async def launch_ai_game(bot: Bot, user_id: int, user_name: str,
     ai_faction_name = data["factions"][ai_faction]["name"]
     ai_leader_name = data["factions"][ai_faction]["leaders"][ai_leader_idx]["name"]
 
-    await bot.send_message(
+    msg = await bot.send_message(
         user_id,
         f"🎮 *Игра против {ai_name}!*\n\n"
         f"Фракция противника: {ai_faction_name}\n"
@@ -1045,7 +1045,9 @@ async def launch_ai_game(bot: Bot, user_id: int, user_name: str,
         reply_markup=kb_mulligan(gs["hand"]["p1"]),
         parse_mode="Markdown"
     )
-    
+    gs.setdefault("mulligan_msg_id", {})["p1"] = msg.message_id
+    save_game(game_id, gs)
+
 async def launch_game(bot: Bot, user_a_id: int, user_b_id: int,
                       setup_a: dict, setup_b: dict, data: dict):
     """Create game and start mulligan phase."""
@@ -1795,6 +1797,9 @@ async def process_update(update_data: dict):
                     side = get_side_for_user(gs, user_id)
                     if side:
                         gs["selected_card_uid"][side] = None
+                        tmp_id = gs.get("tmp_msg_id", {}).get(side)
+                        await delete_msg(bot, chat_id, tmp_id)
+                        gs.setdefault("tmp_msg_id", {})[side] = None
                         save_game(game_id, gs)
                 await bot.send_message(
                     chat_id, "↩️ Выбор отменён.",

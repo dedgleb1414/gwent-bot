@@ -1,31 +1,11 @@
 content = open('index.py', encoding='utf-8').read()
 
-old = '''    save_game(game_id, gs)
+old = '            elif cbd == "cancel_select":\n                gs = get_game(game_id)\n                if gs:\n                    side = get_side_for_user(gs, user_id)\n                    if side:\n                        gs["selected_card_uid"][side] = None\n                        save_game(game_id, gs)'
 
-    swaps = gs["mulligan_swaps"][side]
-    await bot.send_message(
-        chat_id,
-        f"🔄 Замена {swaps}/2: {card['name']} → {new_card['emoji']}{new_card['name']}\\n\\n"
-        f"{'Ещё можно заменить 1 карту.' if swaps < 2 else 'Лимит замен исчерпан.'}",
-        reply_markup=kb_mulligan(gs["hand"][side]),
-    )'''
-
-new = '''    save_game(game_id, gs)
-
-    swaps = gs["mulligan_swaps"][side]
-    prev_mid = gs.get("mulligan_msg_id", {}).get(side)
-    await delete_msg(bot, chat_id, prev_mid)
-    msg = await bot.send_message(
-        chat_id,
-        f"🔄 Замена {swaps}/2: {card['name']} → {new_card['emoji']}{new_card['name']}\\n\\n"
-        f"{'Ещё можно заменить 1 карту.' if swaps < 2 else 'Лимит замен исчерпан.'}",
-        reply_markup=kb_mulligan(gs["hand"][side]),
-    )
-    gs.setdefault("mulligan_msg_id", {})[side] = msg.message_id
-    save_game(game_id, gs)'''
+new = '            elif cbd == "cancel_select":\n                gs = get_game(game_id)\n                if gs:\n                    side = get_side_for_user(gs, user_id)\n                    if side:\n                        gs["selected_card_uid"][side] = None\n                        tmp_id = gs.get("tmp_msg_id", {}).get(side)\n                        await delete_msg(bot, chat_id, tmp_id)\n                        gs.setdefault("tmp_msg_id", {})[side] = None\n                        save_game(game_id, gs)'
 
 if old in content:
     open('index.py', 'w', encoding='utf-8').write(content.replace(old, new))
-    print('mulligan: Fixed')
+    print('Fixed')
 else:
-    print('mulligan: NOT FOUND')
+    print('NOT FOUND')
