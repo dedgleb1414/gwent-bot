@@ -1395,13 +1395,13 @@ async def handle_pass(bot: Bot, chat_id: int, user_id: int,
     gs["turn"] = opp
     save_game(game_id, gs)
 
-    await bot.send_message(chat_id, "✋ Вы спасовали. Ждём противника...")
-    await bot.send_message(opp_id,
-                           f"✋ {p_name} спасовал(а). Ваш ход — можете продолжить или тоже спасовать.")
-    print(f"DEBUG pass: is_ai_game={gs.get('is_ai_game')}, opp={opp}")
     if gs.get("is_ai_game") and opp == "p2":
+        await bot.send_message(chat_id, "✋ Вы спасовали. AI ходит...")
         await do_ai_turn(bot, gs, game_id, data)
     else:
+        await bot.send_message(chat_id, "✋ Вы спасовали. Ждём противника...")
+        await bot.send_message(opp_id,
+                               f"✋ {p_name} спасовал(а). Ваш ход — можете продолжить или тоже спасовать.")
         await start_turn(bot, gs, game_id, opp)
 
 
