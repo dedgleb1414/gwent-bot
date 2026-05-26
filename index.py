@@ -1540,13 +1540,36 @@ async def end_round(bot: Bot, gs: dict, game_id: str, data: dict):
         else:
             final = f"🤝 Ничья! ({w1}:{w2})"
 
-        for pid in (p1_id, p2_id):
+        await bot.send_message(
+            p1_id,
+            f"{result_msg}\n\n{final}\n\n/start — начать новую игру",
+            parse_mode="Markdown"
+        )
+        if p2_id != AI_USER_ID:
             await bot.send_message(
-                pid,
+                p2_id,
                 f"{result_msg}\n\n{final}\n\n/start — начать новую игру",
                 parse_mode="Markdown"
             )
+        # Записываем статистику
+        p1_name = gs["players"]["p1"]["name"]
+        p2_name = gs["players"]["p2"]["name"]
+        if w1 > w2:
+            update_stats(p1_id, "win")
+            if p2_id != AI_USER_ID:
+                update_stats(p2_id, "loss")
+        elif w2 > w1:
+            update_stats(p1_id, "loss")
+            if p2_id != AI_USER_ID:
+                update_stats(p2_id, "win")
+        else:
+            update_stats(p1_id, "draw")
+            if p2_id != AI_USER_ID:
+                update_stats(p2_id, "draw")
         redis_del(game_key(game_id))
+        redis_del(user_game_key(p1_id))
+        if p2_id != AI_USER_ID:
+            redis_del(user_game_key(p2_id))
     else:
         # New round: start directly
         gs["phase"] = "play"
@@ -1569,6 +1592,52 @@ async def end_round(bot: Bot, gs: dict, game_id: str, data: dict):
             await start_turn(bot, gs, game_id, "p1")
 
 
+def stats_key(user_id: int) -> str:
+    return f"gwent:stats:{user_id}"
+
+
+def get_stats(user_id: int) -> dict:
+    data = redis_get(stats_key(user_id))
+    return data or {"wins": 0, "losses": 0, "draws": 0, "games": 0}
+
+
+def update_stats(user_id: int, result: str):
+    """result: win | loss | draw"""
+    stats = get_stats(user_id)
+    stats["games"] += 1
+    if result == "win":
+        stats["wins"] += 1
+    elif result == "loss":
+        stats["losses"] += 1
+    else:
+        stats["draws"] += 1
+    redis_set(stats_key(user_id), stats, ex=86400 * 365)
+
+
+async def handle_stats(bot: Bot, chat_id: int, user_id: int, user_name: str):
+    stats = get_stats(user_id)
+    games = stats["games"]
+    if games == 0:
+        await bot.send_message(
+            chat_id,
+            f"📊 *{user_name}*, у тебя пока нет сыгранных игр!\n\n/start — начать игру",
+            parse_mode="Markdown"
+        )
+        return
+
+    winrate = round(stats["wins"] / games * 100) if games > 0 else 0
+    await bot.send_message(
+        chat_id,
+        f"📊 *Статистика {user_name}:*\n\n"
+        f"🎮 Игр сыграно: *{games}*\n"
+        f"🏆 Побед: *{stats['wins']}*\n"
+        f"💀 Поражений: *{stats['losses']}*\n"
+        f"🤝 Ничьих: *{stats['draws']}*\n"
+        f"📈 Винрейт: *{winrate}%*",
+        parse_mode="Markdown"
+    )
+
+
 async def handle_surrender(bot: Bot, chat_id: int, user_id: int, game_id: str):
     """Игрок сдаётся."""
     gs = get_game(game_id)
@@ -1584,6 +1653,10 @@ async def handle_surrender(bot: Bot, chat_id: int, user_id: int, game_id: str):
     opp_name = gs["players"][opp]["name"]
     opp_id = gs["players"][opp]["id"]
 
+    update_stats(user_id, "loss")
+    if opp_id != AI_USER_ID:
+        update_stats(opp_id, "win")
+        redis_del(user_game_key(opp_id))
     redis_del(game_key(game_id))
     redis_del(user_game_key(user_id))
 
@@ -1775,6 +1848,9 @@ async def process_update(update_data: dict):
         elif text == "/cancel":
             redis_del(queue_key())
             await bot.send_message(chat_id, "❌ Поиск отменён.")
+
+        elif text == "/stats":
+            await handle_stats(bot, chat_id, user_id, user_name)
 
         elif text == "/help":
             await handle_help(bot, chat_id)
