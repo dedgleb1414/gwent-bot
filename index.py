@@ -1481,7 +1481,11 @@ async def handle_medic(bot: Bot, chat_id: int, user_id: int,
         await end_round(bot, gs, game_id, load_data())
         return
 
-    await start_turn(bot, gs, game_id, gs["turn"])
+    next_side = gs["turn"]
+    if gs.get("is_ai_game") and next_side == "p2":
+        await do_ai_turn(bot, gs, game_id, load_data())
+    else:
+        await start_turn(bot, gs, game_id, next_side)
 
 
 async def do_ai_turn(bot: Bot, gs: dict, game_id: str, data: dict):
