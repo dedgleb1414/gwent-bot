@@ -1544,25 +1544,25 @@ async def end_round(bot: Bot, gs: dict, game_id: str, data: dict):
             )
         redis_del(game_key(game_id))
     else:
-        # New round: send mulligan
-        for pid in (p1_id, p2_id):
+        # New round: start directly
+        gs["phase"] = "play"
+        gs["turn"] = "p1"
+        save_game(game_id, gs)
+        await bot.send_message(
+            p1_id,
+            f"{result_msg}\n\n⚔️ *Раунд {gs['round']} начинается!*",
+            parse_mode="Markdown"
+        )
+        if p2_id != AI_USER_ID:
             await bot.send_message(
-                pid,
-                f"{result_msg}\n\n⚔️ *Раунд {gs['round']} начинается!*\nМуллиган: замените до 2 карт.",
+                p2_id,
+                f"{result_msg}\n\n⚔️ *Раунд {gs['round']} начинается!*",
                 parse_mode="Markdown"
             )
-
-        side_now = "p1" if gs["phase"] == "mulligan_p1" else "p2"
-        opp_side = get_opponent(side_now)
-        pid_now = gs["players"][side_now]["id"]
-        pid_opp = gs["players"][opp_side]["id"]
-
-        await bot.send_message(
-            pid_now,
-            "Замените карты:",
-            reply_markup=kb_mulligan(gs["hand"][side_now])
-        )
-        await bot.send_message(pid_opp, "⏳ Ждём противника (муллиган)...")
+        if gs.get("is_ai_game"):
+            await start_turn(bot, gs, game_id, "p1")
+        else:
+            await start_turn(bot, gs, game_id, "p1")
 
 
 async def handle_surrender(bot: Bot, chat_id: int, user_id: int, game_id: str):
