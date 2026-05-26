@@ -1281,19 +1281,32 @@ async def handle_card_select(bot: Bot, chat_id: int, user_id: int,
     save_game(game_id, gs)
 
     ctype = card["type"]
-    if ctype in ("normal", "hero", "spy", "horn", "weather", "decoy"):
-        msg = await bot.send_message(
-            chat_id,
-            f"Выбрана: {card['emoji']} *{card['name']}*\n_{card.get('tip','')}_\n\nКуда поставить?",
-            reply_markup=kb_row_select(card_uid, card),
-            parse_mode="Markdown"
-        )
-        gs.setdefault("tmp_msg_id", {})[side] = msg.message_id
-        save_game(game_id, gs)
+    # Определяем доступные ряды
+    card_row = card.get("row", "melee")
+    if card_row == "any" or ctype in ("horn", "weather", "decoy"):
+        rows_available = ROWS
+    elif card_row in ROWS:
+        rows_available = [card_row]
     else:
-        msg = await bot.send_message(chat_id, f"Выбрана карта: {card['name']}")
-        gs.setdefault("tmp_msg_id", {})[side] = msg.message_id
+        rows_available = ROWS
+
+    # Если ряд один — сразу размещаем без вопроса
+    if len(rows_available) == 1:
+        gs["selected_card_uid"][side] = card_uid
         save_game(game_id, gs)
+        await handle_place_card(bot, chat_id, user_id,
+                                card_uid, rows_available[0], game_id, data)
+        return
+
+    # Иначе спрашиваем
+    msg = await bot.send_message(
+        chat_id,
+        f"Выбрана: {card['emoji']} *{card['name']}*\n_{card.get('tip','')}_\n\nКуда поставить?",
+        reply_markup=kb_row_select(card_uid, card),
+        parse_mode="Markdown"
+    )
+    gs.setdefault("tmp_msg_id", {})[side] = msg.message_id
+    save_game(game_id, gs)
 
 
 async def handle_place_card(bot: Bot, chat_id: int, user_id: int,
