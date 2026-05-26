@@ -1555,17 +1555,17 @@ async def end_round(bot: Bot, gs: dict, game_id: str, data: dict):
         p1_name = gs["players"]["p1"]["name"]
         p2_name = gs["players"]["p2"]["name"]
         if w1 > w2:
-            update_stats(p1_id, "win")
+            update_stats(p1_id, "win", p1_name)
             if p2_id != AI_USER_ID:
-                update_stats(p2_id, "loss")
+                update_stats(p2_id, "loss", p2_name)
         elif w2 > w1:
-            update_stats(p1_id, "loss")
+            update_stats(p1_id, "loss", p1_name)
             if p2_id != AI_USER_ID:
-                update_stats(p2_id, "win")
+                update_stats(p2_id, "win", p2_name)
         else:
-            update_stats(p1_id, "draw")
+            update_stats(p1_id, "draw", p1_name)
             if p2_id != AI_USER_ID:
-                update_stats(p2_id, "draw")
+                update_stats(p2_id, "draw", p2_name)
         redis_del(game_key(game_id))
         redis_del(user_game_key(p1_id))
         if p2_id != AI_USER_ID:
@@ -1601,7 +1601,7 @@ def get_stats(user_id: int) -> dict:
     return data or {"wins": 0, "losses": 0, "draws": 0, "games": 0}
 
 
-def update_stats(user_id: int, result: str):
+def update_stats(user_id: int, result: str, name: str = ""):
     """result: win | loss | draw"""
     stats = get_stats(user_id)
     stats["games"] += 1
@@ -1611,7 +1611,68 @@ def update_stats(user_id: int, result: str):
         stats["losses"] += 1
     else:
         stats["draws"] += 1
+    if name:
+        stats["name"] = name
     redis_set(stats_key(user_id), stats, ex=86400 * 365)
+
+
+async def handle_leaderboard(bot: Bot, chat_id: int):
+    """Показывает топ-10 игроков по победам."""
+    # Получаем все ключи статистики
+    if not UPSTASH_URL:
+        await bot.send_message(chat_id, "Рейтинг недоступен.")
+        return
+
+    headers = {"Authorization": f"Bearer {UPSTASH_TOKEN}"}
+    try:
+        r = httpx.get(f"{UPSTASH_URL}/keys/gwent:stats:*",
+                      headers=headers, timeout=5)
+        keys_data = r.json()
+        keys = keys_data.get("result", [])
+    except Exception:
+        await bot.send_message(chat_id, "Ошибка загрузки рейтинга.")
+        return
+
+    if not keys:
+        await bot.send_message(chat_id, "🏆 Рейтинг пока пуст. Сыграй первым!")
+        return
+
+    players = []
+    for key in keys:
+        try:
+            r = httpx.get(f"{UPSTASH_URL}/get/{key}",
+                          headers=headers, timeout=5)
+            result = r.json().get("result")
+            if result:
+                stats = json.loads(result)
+                user_id = int(key.split(":")[-1])
+                players.append((user_id, stats))
+        except Exception:
+            continue
+
+    # Сортируем по победам потом по винрейту
+    players.sort(key=lambda x: (
+        x[1]["wins"],
+        x[1]["wins"] / max(x[1]["games"], 1)
+    ), reverse=True)
+
+    lines = ["🏆 *Топ игроков:*\n"]
+    medals = ["🥇", "🥈", "🥉"]
+    for i, (uid, stats) in enumerate(players[:10]):
+        medal = medals[i] if i < 3 else f"{i+1}."
+        winrate = round(stats["wins"] / max(stats["games"], 1) * 100)
+        name = stats.get("name", f"Игрок {uid}")
+        lines.append(
+            f"{medal} *{name}*  "
+            f"🏆{stats['wins']} 💀{stats['losses']} "
+            f"({winrate}%)"
+        )
+
+    await bot.send_message(
+        chat_id,
+        "\n".join(lines),
+        parse_mode="Markdown"
+    )
 
 
 async def handle_stats(bot: Bot, chat_id: int, user_id: int, user_name: str):
@@ -1851,6 +1912,9 @@ async def process_update(update_data: dict):
 
         elif text == "/stats":
             await handle_stats(bot, chat_id, user_id, user_name)
+
+        elif text == "/leaderboard" or text == "/top":
+            await handle_leaderboard(bot, chat_id)
 
         elif text == "/help":
             await handle_help(bot, chat_id)
