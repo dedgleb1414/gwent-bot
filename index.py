@@ -1449,7 +1449,7 @@ async def do_ai_turn(bot: Bot, gs: dict, game_id: str, data: dict):
     side = "p2"
     difficulty = gs.get("ai_difficulty", "medium")
 
-    await asyncio.sleep(1.2)  # пауза для реалистичности
+    # пауза убрана для совместимости с serverless
 
     # Пасовать?
     if not gs["passed"][side] and ai_should_pass(gs, side, difficulty):
