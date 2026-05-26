@@ -462,19 +462,17 @@ def apply_card(gs: dict, side: str, card_uid: str, target_row: str,
             gs["awaiting_medic"][side] = True
             msg += " | Медик: выберите карту для воскрешения"
 
-    # ── Kazn (Scorch) ──
+    # ── Kazn (Scorch) — убирает сильнейшую карту с melee противника ──
     if "kazn" in card.get("abilities", []):
         best_val = 0
         best_card = None
-        best_row = None
-        for r in ROWS:
-            for c in gs["rows"][opp][r]:
-                if c["type"] != "hero" and c["val"] > best_val:
-                    best_val = c["val"]
-                    best_card = c
-                    best_row = r
+        best_row = "melee"
+        for c in gs["rows"][opp]["melee"]:
+            if c["type"] != "hero" and c["val"] > best_val:
+                best_val = c["val"]
+                best_card = c
         if best_card:
-            gs["rows"][opp][best_row] = [c for c in gs["rows"][opp][best_row]
+            gs["rows"][opp]["melee"] = [c for c in gs["rows"][opp]["melee"]
                                           if c["uid"] != best_card["uid"]]
             gs["graveyard"][opp].append(best_card)
             msg += f" | 💀 Казнь: уничтожен {best_card['name']} ({best_val})"
@@ -1422,10 +1420,51 @@ async def handle_medic(bot: Bot, chat_id: int, user_id: int,
         card = next((c for c in grave if c["uid"] == card_uid), None)
         if card:
             gs["graveyard"][side] = [c for c in grave if c["uid"] != card_uid]
-            row = card.get("row", "melee")
-            if row not in ROWS:
-                row = "melee"
-            gs["rows"][side][row].append(card)
+            opp = get_opponent(side)
+            # Шпион воскрешается на чужое поле + даём 2 карты
+            if card["type"] == "spy":
+                row = card.get("row", "melee")
+                if row not in ROWS:
+                    row = "melee"
+                gs["rows"][opp][row].append(card)
+                drawn = []
+                for _ in range(2):
+                    if gs["deck"][side]:
+                        new_card = gs["deck"][side].pop(0)
+                        gs["hand"][side].append(new_card)
+                        drawn.append(new_card["name"])
+                drawn_str = ", ".join(drawn) if drawn else "нет карт"
+                await bot.send_message(
+                    chat_id,
+                    f"👁 Шпион {card['name']} воскрешён на поле врага! Взято: {drawn_str}"
+                )
+            elif "kazn" in card.get("abilities", []):
+                # Дракон воскрешается и сразу убивает сильнейшую карту melee врага
+                row = card.get("row", "melee")
+                if row not in ROWS:
+                    row = "melee"
+                gs["rows"][side][row].append(card)
+                best_val = 0
+                best_card = None
+                for c in gs["rows"][opp]["melee"]:
+                    if c["type"] != "hero" and c["val"] > best_val:
+                        best_val = c["val"]
+                        best_card = c
+                if best_card:
+                    gs["rows"][opp]["melee"] = [
+                        c for c in gs["rows"][opp]["melee"]
+                        if c["uid"] != best_card["uid"]
+                    ]
+                    gs["graveyard"][opp].append(best_card)
+                    await bot.send_message(
+                        chat_id,
+                        f"🐲 {card['name']} воскрешён! Казнь: {best_card['name']} ({best_val}) уничтожен"
+                    )
+            else:
+                row = card.get("row", "melee")
+                if row not in ROWS:
+                    row = "melee"
+                gs["rows"][side][row].append(card)
             gs["awaiting_medic"][side] = False
             await bot.send_message(
                 chat_id,
