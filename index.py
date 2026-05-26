@@ -1508,16 +1508,20 @@ async def do_ai_turn(bot: Bot, gs: dict, game_id: str, data: dict):
                 gs["rows"][side][r].append(card)
         gs["awaiting_medic"][side] = False
 
-    if not gs["passed"]["p1"]:
-        gs["turn"] = "p1"
     save_game(game_id, gs)
 
     if check_round_end(gs):
         await end_round(bot, gs, game_id, data)
         return
 
-    await start_turn(bot, gs, game_id, "p1")
-    
+    # Если игрок спасовал — AI продолжает ходить
+    if gs["passed"]["p1"]:
+        await do_ai_turn(bot, gs, game_id, data)
+    else:
+        gs["turn"] = "p1"
+        save_game(game_id, gs)
+        await start_turn(bot, gs, game_id, "p1")
+
 async def end_round(bot: Bot, gs: dict, game_id: str, data: dict):
     result_msg = resolve_round(gs, data)
     save_game(game_id, gs)
